@@ -1,0 +1,40 @@
+# WhatsApp Football Event Analyzer Configuration
+
+# WhatsApp settings
+whatsapp:
+  # Group name to monitor (source of event messages)
+  source_group_name: "Jahrgang 2014er Trainer"
+  # Group JID to monitor (get via: wacli groups list)
+  source_group: "4915783881850-1547842719@g.us"
+  # Group name to send results to
+  notify_group_name: "Termine"
+  # Chat/Group JID to send notifications to
+  notify_to: "120363424707458289@g.us"
+
+# Filter defaults
+filters:
+  # Only show events from the last N days (0 = no limit)
+  days_back: 7
+  # Skill level range (1-10 scale)
+  min_level: 1
+  max_level: 10
+  # Age groups to include (empty = all)
+  age_groups: []
+  # Event types: tournament, friendly_match
+  event_types:
+    - tournament
+    - friendly_match
+  # Only show open events (not full)
+  only_open: true
+
+# OCR settings
+ocr:
+  language: "deu"
+  # Preprocess images for better accuracy
+  preprocess: true
+
+# Storage paths
+paths:
+  events_db: "data/events.json"
+  media_dir: "data/media"
+  last_sync: "data/last_sync.txt"
