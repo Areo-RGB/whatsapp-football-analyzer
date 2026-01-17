@@ -1,0 +1,4 @@
+#!/bin/bash
+# Quick WhatsApp Football Analyzer runner
+cd "$(dirname "$0")"
+./venv/bin/python quick_analyze.py --force "$@"

@@ -14,7 +14,7 @@ whatsapp:
 # Filter defaults
 filters:
   # Only show events from the last N days (0 = no limit)
-  days_back: 7
+  days_back: 14
   # Skill level range (1-10 scale)
   min_level: 1
   max_level: 10

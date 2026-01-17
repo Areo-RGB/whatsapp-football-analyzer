@@ -6,9 +6,63 @@ Provides Python interface for wacli commands.
 import json
 import subprocess
 import shutil
+import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
+
+
+def get_sender_phones(message_ids: list[str], store_dir: str | None = None) -> dict[str, str]:
+    """
+    Look up actual sender phone numbers for messages from whatsmeow session.db.
+    
+    wacli stores group JID as sender_jid for group messages, but the real sender
+    info is in whatsmeow_message_secrets table, which can be joined with 
+    whatsmeow_lid_map to get the actual phone number.
+    
+    Args:
+        message_ids: List of message IDs to look up
+        store_dir: Optional wacli store directory (default: ~/.wacli)
+        
+    Returns:
+        Dict mapping message_id -> phone number (e.g., "4917632223598")
+    """
+    if not message_ids:
+        return {}
+    
+    store_path = Path(store_dir) if store_dir else Path.home() / ".wacli"
+    session_db = store_path / "session.db"
+    
+    if not session_db.exists():
+        return {}
+    
+    try:
+        conn = sqlite3.connect(str(session_db))
+        cursor = conn.cursor()
+        
+        # Build query with placeholders for message IDs
+        placeholders = ",".join("?" * len(message_ids))
+        query = f"""
+            SELECT 
+                ms.message_id,
+                lm.pn as phone
+            FROM whatsmeow_message_secrets ms
+            LEFT JOIN whatsmeow_lid_map lm 
+                ON substr(ms.sender_jid, 1, instr(ms.sender_jid, '@')-1) = lm.lid
+            WHERE ms.message_id IN ({placeholders})
+        """
+        
+        cursor.execute(query, message_ids)
+        results = {row[0]: row[1] for row in cursor.fetchall() if row[1]}
+        
+        conn.close()
+        return results
+        
+    except Exception as e:
+        # Silently fail - phone lookup is optional enhancement
+        return {}
+
+
 
 
 def check_wacli() -> bool:

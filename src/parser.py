@@ -18,6 +18,7 @@ class Message:
     content: str
     has_media: bool = False
     media_path: str | None = None
+    msg_id: str | None = None  # wacli message ID for phone lookup
 
     def __repr__(self) -> str:
         return f"Message({self.timestamp}, {self.sender[:15]}..., {self.content[:30]}...)"

@@ -22,7 +22,7 @@ from .summarizer import (
     generate_summary, generate_weekly_digest, generate_daily_digest,
     format_event_full
 )
-from .whatsapp import WacliClient, check_wacli, find_group_by_name
+from .whatsapp import WacliClient, check_wacli, find_group_by_name, get_sender_phones
 from .ai_extractor import extract_events_with_ai, analyze_messages_with_ai
 from .calendar import sync_events_to_calendar, list_calendars, CALENDAR_NAME
 
@@ -233,7 +233,8 @@ def sync(ctx, group, limit, full, ai, regex):
                 timestamp=ts,
                 sender=wm.sender,
                 content=wm.text,
-                has_media=wm.has_media
+                has_media=wm.has_media,
+                msg_id=wm.id
             ))
         
         console.print(f"  New messages: [green]{len(messages)}[/]")
@@ -273,28 +274,68 @@ def sync(ctx, group, limit, full, ai, regex):
         
         console.print(f"  [green]{len(image_paths)}[/] images available")
         
+        # Look up actual sender phone numbers from whatsmeow database (needed for both OCR and text)
+        message_ids = [wm.id for wm in wacli_messages]
+        sender_phones = get_sender_phones(message_ids)
+        
         # Extract text from images using OCR (PaddleOCR)
-        ocr_text = ""
-        if image_paths:
+        # Include sender phone for each image
+        ocr_parts = []
+        if image_paths and media_messages:
             console.print(f"\n[bold blue]Running OCR on {len(image_paths)} images...[/]")
-            ocr_text = extract_text_from_images(image_paths)
-            console.print(f"  Extracted [green]{len(ocr_text)}[/] chars from images")
+            
+            # Create mapping from image path to message ID
+            path_to_msg = {}
+            for wm in media_messages:
+                existing = list(media_dir.glob(f"*{wm.id}*"))
+                if existing:
+                    path_to_msg[str(existing[0])] = wm.id
+            
+            for img_path in image_paths:
+                try:
+                    from .ocr import extract_text_from_image
+                    ocr_text = extract_text_from_image(img_path)
+                    if ocr_text and ocr_text.strip():
+                        # Get sender phone for this image
+                        msg_id = path_to_msg.get(img_path)
+                        phone = sender_phones.get(msg_id) if msg_id else None
+                        
+                        if phone:
+                            formatted_phone = f"+{phone}" if not phone.startswith('+') else phone
+                            ocr_parts.append(f"[Von: {formatted_phone}]\n{ocr_text}")
+                        else:
+                            ocr_parts.append(ocr_text)
+                except Exception as e:
+                    console.print(f"    [red]OCR failed for {img_path}: {e}[/]")
+            
+            total_chars = sum(len(p) for p in ocr_parts)
+            console.print(f"  Extracted [green]{total_chars}[/] chars from images")
         
         # Run AI analysis (default behavior) - TEXT ONLY, no images
-        if ai and (messages or ocr_text):
+        if ai and (messages or ocr_parts):
             console.print("\n[bold blue]Running AI analysis (text only)...[/]")
             
             # Combine message content + OCR text for AI analysis
+            # Include sender phone where available using msg_id
             content_parts = []
             for msg in messages:
                 if msg.content:
-                    content_parts.append(f"{msg.sender}: {msg.content}")
+                    # Get phone number using msg_id directly
+                    phone = sender_phones.get(msg.msg_id) if msg.msg_id else None
+                    
+                    # Format with phone if available
+                    if phone:
+                        # Format as +49 XXX format for AI
+                        formatted_phone = f"+{phone}" if not phone.startswith('+') else phone
+                        content_parts.append(f"[Von: {formatted_phone}]\n{msg.content}")
+                    else:
+                        content_parts.append(f"{msg.sender}: {msg.content}")
             
-            combined_content = "\n".join(content_parts)
+            combined_content = "\n\n".join(content_parts)
             
-            # Add OCR text
-            if ocr_text:
-                combined_content += f"\n\n--- OCR FROM IMAGES ---\n{ocr_text}"
+            # Add OCR text with sender phones already included
+            if ocr_parts:
+                combined_content += "\n\n--- OCR FROM IMAGES ---\n" + "\n\n".join(ocr_parts)
             
             console.print(f"  Analyzing {len(combined_content)} chars (text only, faster)...")
             ai_events = analyze_messages_with_ai(combined_content)  # No images, just text

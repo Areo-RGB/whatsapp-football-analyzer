@@ -60,9 +60,16 @@ WICHTIG:
 - "voll" oder "ausgebucht" bedeutet status: "full"
 - "Testspiel" oder "Spielpartner gesucht" = friendly_match
 - "Turnier" oder "einladen" = tournament
-- EXTRAHIERE die Telefonnummer des Absenders aus dem WhatsApp-Format am Anfang der Nachricht (z.B. "+49 176 12345678:" bedeutet contact_phone: "+49176 12345678")
-- Der Name am Ende der Nachricht (z.B. "Grüße Kay" oder "Tomislav, S.D Croatia") ist der contact_name
-- WICHTIG: Telefonnummern beginnen mit + oder sind reine Ziffern (z.B. +49173..., 0176...). IGNORIERE JIDs wie "4915783881850-1547842719@g.us" - das sind KEINE Telefonnummern!
+- TELEFONNUMMER (contact_phone): 
+  * WICHTIG: Nachrichten beginnen oft mit "[Von: +49...]" - diese Nummer ist die contact_phone des Absenders!
+  * Beispiel: "[Von: +4917632223598]\nHallo zusammen..." → contact_phone: "+4917632223598"
+  * Alternativ suche im Text nach: "Telefon:", "Tel:", "Mobil:", "Handy:"
+  * IGNORIERE JIDs wie "4915783881850-1547842719@g.us" - das sind KEINE Telefonnummern!
+- KONTAKTNAME (contact_name): Der Name der Kontaktperson findet sich oft:
+  * Nach Grußformeln: "Grüße", "VG", "LG", "Beste Grüße", "Sportliche Grüße"
+  * Als letzter Name vor einem Vereinsnamen (z.B. "Tomislav, S.D Croatia" → contact_name: "Tomislav")
+  * Neben einer Telefonnummer (z.B. "Telefon Antje 0162..." → contact_name: "Antje")
+  * In der Signatur am Ende der Nachricht
 - Bei Bildern: Extrahiere alle sichtbaren Event-Informationen aus Flyern/Postern
 """
 

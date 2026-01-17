@@ -50,11 +50,8 @@ def format_event_short(event: Event) -> str:
     if event.date:
         date_str = f"{event.date.day}.{event.date.month}."
     
-    level_str = f"Stärke {event.skill_level}" if event.skill_level else ""
-    
     parts = [emoji, date_str, event.organizer or "Unbekannt"]
-    if level_str:
-        parts.append(f"({level_str})")
+    # Removed level_str per user request
     if event.status == "full":
         parts.append("❌ VOLL")
     
@@ -85,10 +82,8 @@ def format_event_full(event: Event) -> str:
     
     # Details
     details = []
-    if event.skill_level:
-        details.append(f"Stärke: {event.skill_level}/10")
-    if event.age_group:
-        details.append(f"Alter: {event.age_group}")
+    details = []
+    # Removed skill_level and age_group per user request
     if details:
         lines.append(f"ℹ️ {' | '.join(details)}")
     
@@ -105,8 +100,7 @@ def format_event_full(event: Event) -> str:
     
     # Extras
     extras = []
-    if event.catering:
-        extras.append("🍕 Catering")
+    # Removed catering per user request
     if event.entry_fee:
         extras.append(f"💰 {event.entry_fee}€")
     if extras:
@@ -119,34 +113,29 @@ def format_event_compact(event: Event) -> str:
     """Format event in compact multi-line format."""
     lines = []
     
-    # Type emoji and date
-    emoji = "🏆" if event.event_type == "tournament" else "⚽"
+    # Type emoji (only for tournaments) and date
+    # emoji = "🏆 " if event.event_type == "tournament" else ""
     date_str = format_date_german(event.date) if event.date else "Datum TBD"
-    lines.append(f"{emoji} *{date_str}*")
+    lines.append(f"*{date_str}*")
     
     # Organizer and location
     org_loc = []
     if event.organizer:
-        org_loc.append(event.organizer)
+        org_loc.append(f"*{event.organizer}*")
     if event.location:
         org_loc.append(event.location)
     if org_loc:
-        lines.append("   " + " - ".join(org_loc))
+        lines.append("- " + " - ".join(org_loc))
     
-    # Maps link
-    if event.maps_url:
-        lines.append(f"   📍 {event.maps_url}")
+
     
     # Level and age
     info = []
-    if event.skill_level:
-        info.append(f"Stärke {event.skill_level}")
-    if event.age_group:
-        info.append(event.age_group)
+    # Removed skill_level and age_group per user request
     if event.time_start:
         info.append(format_time_range(event.time_start, event.time_end))
     if info:
-        lines.append("   " + " | ".join(info))
+        lines.append("- " + " | ".join(info))
     
     # Contact details
     if event.contact_name or event.contact_phone:
@@ -154,12 +143,19 @@ def format_event_compact(event: Event) -> str:
         if event.contact_name:
             contact_parts.append(event.contact_name)
         if event.contact_phone:
-            contact_parts.append(event.contact_phone)
-        lines.append("   📞 " + " | ".join(contact_parts))
+            contact_parts.append(f"``` {event.contact_phone} ```")
+    # Contact details
+    if event.contact_name or event.contact_phone:
+        contact_parts = []
+        if event.contact_name:
+            contact_parts.append(event.contact_name)
+        if event.contact_phone:
+            contact_parts.append(f"``` {event.contact_phone} ```")
+        lines.append("- " + " | ".join(contact_parts))
     
     # Status
     if event.status == "full":
-        lines.append("   ❌ AUSGEBUCHT")
+        lines.append("- AUSGEBUCHT")
     
     return "\n".join(lines)
 
@@ -168,7 +164,7 @@ def generate_summary(
     events: list[Event],
     format_style: Literal["short", "compact", "full"] = "compact",
     title: str | None = None,
-    include_header: bool = True
+    include_header: bool = False
 ) -> str:
     """
     Generate a summary of events.
