@@ -329,6 +329,35 @@ class WacliClient:
         
         return code == 0
     
+    def send_image(self, group_jid: str, image_path: str, caption: str = None) -> bool:
+        """
+        Send an image to a group.
+        
+        Args:
+            group_jid: Group JID (e.g., "123456789@g.us")
+            image_path: Path to image file
+            caption: Optional caption for the image
+            
+        Returns:
+            True if sent successfully
+        """
+        args = [
+            'send', 'file',
+            '--to', group_jid,
+            '--file', str(image_path),
+        ]
+        
+        if caption:
+            args.extend(['--caption', caption])
+        
+        code, stdout, stderr = self._run(
+            *args,
+            json_output=False,
+            timeout=60
+        )
+        
+        return code == 0
+    
     def download_media(self, chat_jid: str, message_id: str, output_dir: str | Path) -> str | None:
         """
         Download media from a message.

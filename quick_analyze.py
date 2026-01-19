@@ -14,6 +14,7 @@ Usage:
 
 import sys
 import argparse
+import subprocess
 from pathlib import Path
 from datetime import datetime, timedelta, date
 
@@ -243,6 +244,10 @@ def main():
     if not client.is_authenticated():
         print("❌ Not authenticated. Run 'wacli auth' first.")
         return 1
+
+    # Refresh groups cache to ensure all groups are available
+    print("  🔄 Refreshing groups cache...")
+    subprocess.run(["wacli", "groups", "refresh"], capture_output=True)
 
     # Find source group
     source_group = find_group_by_name(client, GROUP_NAME)

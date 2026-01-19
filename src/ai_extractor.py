@@ -17,8 +17,20 @@ from .extractor import Event
 EXTRACTION_PROMPT = """Du bist ein Experte für die Analyse von Fußball-Event-Ankündigungen aus WhatsApp-Nachrichten.
 Extrahiere strukturierte Event-Informationen aus dem folgenden Text und/oder Bildern.
 
-Der Text kann aus OCR (verrauscht) oder WhatsApp-Nachrichten stammen.
-Extrahiere NUR Events, die Turniere oder Testspiele/Freundschaftsspiele sind.
+EXTRAHIERE NUR Nachrichten wo jemand:
+1. Ein Turnier oder Testspiel VERANSTALTET und Teams sucht
+2. Ein Team HAT das ein Turnier oder Testspiel SUCHT
+3. Eine SERIE von Leistungsvergleichen/Spielterminen anbietet
+
+WICHTIG - MEHRERE EVENTS:
+- Eine Nachricht kann MEHRERE Termine enthalten!
+- Beispiel: "📌 Mi., 21.01.2026" und "📌 Mi., 28.01.2026" = 2 separate Events
+- Erstelle für JEDEN Termin ein eigenes Event im JSON Array
+
+IGNORIERE diese Nachrichten:
+- "Gefunden", "Danke für die Anfragen" - das sind nur Bestätigungen
+- Nachrichten die jemanden bitten sich zu melden (z.B. "kann sich X bei mir melden")
+- Nachrichten ohne konkretes Datum (nur "Samstag" ohne Datum reicht NICHT)
 
 Antworte IMMER im folgenden JSON-Format (NUR JSON, kein anderer Text):
 {
@@ -28,10 +40,7 @@ Antworte IMMER im folgenden JSON-Format (NUR JSON, kein anderer Text):
       "date": "YYYY-MM-DD" oder null,
       "time_start": "HH:MM" oder null,
       "time_end": "HH:MM" oder null,
-      "location": "Ort/Adresse" oder null,
-      "maps_url": "Google Maps URL" oder null,
-      "skill_level": Zahl 1-10 oder null,
-      "age_group": "z.B. D-Jugend, U12, JG2014" oder null,
+      "location": "Vollständige Adresse für Google Calendar" oder null,
       "organizer": "Vereinsname" oder null,
       "contact_phone": "Telefonnummer im Format +49..." oder null,
       "contact_name": "Name der Kontaktperson" oder null,
@@ -42,35 +51,53 @@ Antworte IMMER im folgenden JSON-Format (NUR JSON, kein anderer Text):
   ]
 }
 
-GOOGLE MAPS LINKS:
-- Wenn eine Adresse vorhanden ist, erstelle einen Google Maps Link im Format:
-  https://www.google.com/maps/search/?api=1&query=[URL-encoded Adresse]
-- Beispiel: "Felixstrasse 26, 12099 Berlin" wird zu:
-  https://www.google.com/maps/search/?api=1&query=Felixstrasse+26%2C+12099+Berlin
-- Ersetze Leerzeichen durch + und Sonderzeichen durch URL-Encoding (%2C für Komma etc.)
+LOCATION (Adresse):
+- Formatiere die Adresse IMMER vollständig für Google Calendar Integration
+- Format: "Straße Hausnummer, PLZ Stadt, Deutschland"
+- Beispiel: "Ernst-Ludwig-Heim-Str. 14, 13125 Berlin, Deutschland"
 
-Wenn keine Events gefunden werden, antworte mit: {"events": []}
+KONTAKTNAME (contact_name) - SEHR WICHTIG:
+- Steht IMMER am Ende der Nachricht nach Grußformeln
+- Suche nach: "LG [Name]", "Grüße [Name]", "VG [Name]"
+- Beispiele aus echten Nachrichten:
+  * "LG Batuhan" → contact_name: "Batuhan"
+  * "Viele Grüße Denis" → contact_name: "Denis"  
+  * "Danke und Grüße André" → contact_name: "André"
+  * "LG Selçuk" → contact_name: "Selçuk"
+  * "Lg Sebastian" → contact_name: "Sebastian"
 
-WICHTIG:
+TELEFONNUMMER (contact_phone):
+- Nachrichten beginnen mit "[Von: +49...]" - das ist die contact_phone!
+- Beispiel: "[19.01.2026 09:35] [Von: +491793278560]" → contact_phone: "+491793278560"
+
+ZEITEN (time_start, time_end):
+- "10-15 uhr" oder "ca. 10-15 uhr" → time_start: "10:00", time_end: "15:00"
+- "ab 09:00 Uhr" → time_start: "09:00"
+
+DATUM:
 - Das aktuelle Jahr ist 2026
-- Daten wie "25.01." bedeuten 25.01.2026
-- Daten wie "08.03" oder "15.03" bedeuten 08.03.2026 bzw 15.03.2026
-- "Stärke 5" oder "Niveau 5" bedeutet skill_level: 5
-- "mittelstark 7/10" bedeutet skill_level: 7
-- "voll" oder "ausgebucht" bedeutet status: "full"
-- "Testspiel" oder "Spielpartner gesucht" = friendly_match
-- "Turnier" oder "einladen" = tournament
-- TELEFONNUMMER (contact_phone): 
-  * WICHTIG: Nachrichten beginnen oft mit "[Von: +49...]" - diese Nummer ist die contact_phone des Absenders!
-  * Beispiel: "[Von: +4917632223598]\nHallo zusammen..." → contact_phone: "+4917632223598"
-  * Alternativ suche im Text nach: "Telefon:", "Tel:", "Mobil:", "Handy:"
-  * IGNORIERE JIDs wie "4915783881850-1547842719@g.us" - das sind KEINE Telefonnummern!
-- KONTAKTNAME (contact_name): Der Name der Kontaktperson findet sich oft:
-  * Nach Grußformeln: "Grüße", "VG", "LG", "Beste Grüße", "Sportliche Grüße"
-  * Als letzter Name vor einem Vereinsnamen (z.B. "Tomislav, S.D Croatia" → contact_name: "Tomislav")
-  * Neben einer Telefonnummer (z.B. "Telefon Antje 0162..." → contact_name: "Antje")
-  * In der Signatur am Ende der Nachricht
-- Bei Bildern: Extrahiere alle sichtbaren Event-Informationen aus Flyern/Postern
+- "25.01" oder "25.01." → 2026-01-25
+- "14.02.25" ist ein Tippfehler, bedeutet 2026-02-14
+- "01.02." → 2026-02-01
+
+EVENT TYPES:
+- "sucht Turnier" oder "sucht Hallenturnier" = tournament (Team sucht Turnier)
+- "lädt ein" oder "veranstaltet Turnier" = tournament (Team veranstaltet)
+- "sucht Testspiel" oder "sucht Spielmöglichkeit" = friendly_match
+- "Leistungsvergleich" = friendly_match (auch als Serie mit mehreren Terminen!)
+
+EMOJI-FORMATIERTE NACHRICHTEN:
+- 📍 Ort: = location
+- 🕔 oder 🕘 Uhrzeit: = time_start, time_end
+- 📅 Termine: = Liste von Daten (erstelle separate Events!)
+- 📌 Mi., 21.01.2026 = ein Termin → ein Event
+- Der Kontaktname steht oft ganz am Ende: "Vereinsname / [Name]" → contact_name
+
+BEISPIEL mit mehreren Terminen:
+Nachricht enthält "📌 Mi., 21.01.2026" und "📌 Mi., 28.01.2026"
+→ Erstelle 2 Events mit unterschiedlichen Daten aber gleicher Location/Zeit/Kontakt
+
+Wenn keine gültigen Events gefunden werden, antworte mit: {"events": []}
 """
 
 
@@ -94,10 +121,16 @@ def call_gemini_cli(prompt: str, image_paths: list[str] | None = None) -> str | 
             for img_path in image_paths:
                 full_prompt += f"- Bild: {img_path}\n"
         
-        # Use npx to run the Gemini CLI with --yolo flag and model
-        # Note: Gemini CLI reads files from current directory
+        # Use npx to run the Gemini CLI with structured JSON output
+        # --output-format json returns {"response": "...", "stats": {...}, "error": {...}}
         result = subprocess.run(
-            ["npx", "-y", "@google/gemini-cli", "--yolo", "-m", "gemini-2.5-flash-lite", "-p", full_prompt],
+            [
+                "npx", "-y", "@google/gemini-cli",
+                "--yolo",
+                "-m", "gemini-3-pro-preview",
+                "--output-format", "json",
+                "-p", full_prompt
+            ],
             capture_output=True,
             text=True,
             timeout=300,  # 5 minute timeout for images
@@ -105,7 +138,22 @@ def call_gemini_cli(prompt: str, image_paths: list[str] | None = None) -> str | 
         )
         
         if result.returncode == 0:
-            return result.stdout
+            # Parse the structured JSON response
+            try:
+                response_data = json.loads(result.stdout)
+                
+                # Check for errors in response
+                if response_data.get("error"):
+                    error = response_data["error"]
+                    print(f"  Gemini API error: {error.get('type')}: {error.get('message')}")
+                    return None
+                
+                # Return the response text
+                return response_data.get("response", "")
+                
+            except json.JSONDecodeError:
+                # Fallback to raw output if not valid JSON
+                return result.stdout
         else:
             print(f"  Gemini CLI error: {result.stderr[:200]}")
             return None
@@ -191,7 +239,6 @@ def extract_events_with_ai(text: str, image_paths: list[str] | None = None, sour
                 time_start=event_data.get("time_start"),
                 time_end=event_data.get("time_end"),
                 location=event_data.get("location"),
-                maps_url=event_data.get("maps_url"),
                 skill_level=event_data.get("skill_level"),
                 age_group=event_data.get("age_group"),
                 organizer=event_data.get("organizer"),
@@ -200,6 +247,7 @@ def extract_events_with_ai(text: str, image_paths: list[str] | None = None, sour
                 status=event_data.get("status", "open"),
                 entry_fee=event_data.get("entry_fee"),
                 raw_text=text[:500] if text else "",
+                summary=event_data.get("summary", ""),
                 source_timestamp=source_date
             )
             events.append(event)

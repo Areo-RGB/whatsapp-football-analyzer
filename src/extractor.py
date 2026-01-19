@@ -32,6 +32,7 @@ class Event:
     catering: bool = False
     entry_fee: float | None = None
     raw_text: str = ""
+    summary: str = ""  # AI-generated summary
     source_timestamp: datetime | None = None
     
     def to_dict(self) -> dict:

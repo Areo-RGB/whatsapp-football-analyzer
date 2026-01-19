@@ -24,7 +24,7 @@ from .summarizer import (
 )
 from .whatsapp import WacliClient, check_wacli, find_group_by_name, get_sender_phones
 from .ai_extractor import extract_events_with_ai, analyze_messages_with_ai
-from .calendar import sync_events_to_calendar, list_calendars, CALENDAR_NAME
+from .gcalendar import sync_events_to_calendar, list_calendars, CALENDAR_NAME
 
 console = Console()
 
